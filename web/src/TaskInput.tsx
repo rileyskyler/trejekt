@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { createEditor, Editor, Transforms, Text, Node, Location, Range } from 'slate'
+import { createEditor, Editor, Transforms, Node, Range } from 'slate'
 import { withHistory } from 'slate-history'
 import ReactDOM from 'react-dom'
+import { TextInput, TextArea } from 'grommet'
 
 import { Slate, Editable, withReact, ReactEditor, useSelected, useFocused } from 'slate-react'
 import './App.css';
@@ -73,7 +74,13 @@ const TaskInput = () => {
     }
   ])
   const ref = useRef()
-  const [target, setTarget] = useState<Range | null>(null)
+
+  interface Target {
+    type: string
+    range: Range
+  }
+
+  const [target, setTarget] = useState<Target | null>(null)
   const [index, setIndex] = useState(0)
   const [search, setSearch] = useState('')
   const renderElement = useCallback(props => <Element {...props} />, [])
@@ -87,7 +94,7 @@ const TaskInput = () => {
     return (
       <span
         {...props.attributes}
-        style={{ fontWeight: props.leaf.bold ? 'bold' : 'normal' }}
+        style={{ fontWeight: props.leaf.type ? 'bold' : 'normal' }}
       >
         {props.children}
       </span>
@@ -99,16 +106,16 @@ const TaskInput = () => {
   useEffect(() => {
     if (target && chars.length > 0) {
       const el: any = ref.current
-      const domRange = ReactEditor.toDOMRange(editor, target)
+      const domRange = ReactEditor.toDOMRange(editor, target.range)
       const rect = domRange.getBoundingClientRect()
       el.style.top = `${rect.top + window.pageYOffset + 24}px`
       el.style.left = `${rect.left + window.pageXOffset}px`
     }
   }, [chars.length, editor, index, search, target])
 
-  const insertTag = (editor: any, character: any) => {
-    const tag = { type: 'tag', character, children: [{ text: '' }] }
-    Transforms.insertNodes(editor, tag)
+  const insertNode = (editor: any, type: string, character: any) => {
+    const node = { type, character, children: [{ text: '' }] }
+    Transforms.insertNodes(editor, node)
     Transforms.move(editor)
   }
 
@@ -128,14 +135,14 @@ const TaskInput = () => {
             break
           case ' ':
             event.preventDefault()
-            Transforms.select(editor, target)
-            insertTag(editor, Editor.string(editor, target).replace('#', ''))
+            Transforms.select(editor, target.range)
+            insertNode(editor, target.type, Editor.string(editor, target.range).slice(1))
             setTarget(null)
             break
           case 'Enter':
             event.preventDefault()
-            Transforms.select(editor, target)
-            insertTag(editor, chars[index])
+            Transforms.select(editor, target.range)
+            insertNode(editor, target.type, chars[index])
             break
           case 'Escape':
             event.preventDefault()
@@ -162,7 +169,7 @@ const TaskInput = () => {
       const afterText = Editor.string(editor, afterRange)
       const afterMatch = afterText.match(/^(\s|$)/)
       if (beforeMatch && afterMatch) {
-        setTarget(beforeRange)
+        setTarget({ type: 'tag', range: beforeRange })
         setSearch(beforeMatch[1])
         setIndex(0)
         return
@@ -179,6 +186,7 @@ const TaskInput = () => {
         onChange={onChange}
       >
         <Editable
+          style={{ border: '1px solid black' }}
           renderElement={renderElement}
           renderLeaf={renderLeaf}
           onKeyDown={onKeyDown}
@@ -215,7 +223,6 @@ const TaskInput = () => {
           </Portal>
         )}
       </Slate>
-      <>{JSON.stringify(value)}</>
     </>
   )
 }
